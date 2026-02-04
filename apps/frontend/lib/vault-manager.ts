@@ -4,6 +4,10 @@
 
 import { api } from './api';
 import { deriveKey, encrypt, decrypt, generateSalt, hash } from './crypto';
+import { demoStorage } from './demo-storage';
+
+// Demo mode flag
+const DEMO_MODE = true; // Set to false when backend is ready
 
 export interface VaultItem {
   id: string;
@@ -47,12 +51,32 @@ class VaultManager {
     // Generate auth hash (different from encryption key)
     const authHash = await hash(masterPassword + email);
 
-    // For now, we'll use placeholder RSA keys
-    // In production, generate actual RSA key pair
+    if (DEMO_MODE) {
+      // Demo mode - store locally
+      const userId = Date.now().toString();
+      demoStorage.saveUser({
+        id: userId,
+        email,
+        passwordHash: authHash,
+        salt: saltBase64,
+        createdAt: new Date().toISOString(),
+      });
+      demoStorage.setSession(userId, email);
+      
+      // Initialize vault
+      await this.initialize(masterPassword, saltBase64);
+      
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('userEmail', email);
+      }
+      
+      return { user: { id: userId, email } };
+    }
+
+    // Production mode - use API
     const publicKey = 'placeholder-public-key';
     const encryptedPrivateKey = 'placeholder-encrypted-private-key';
 
-    // Register with API
     const response = await api.register(
       email,
       authHash,
@@ -65,13 +89,9 @@ class VaultManager {
       throw new Error(response.error);
     }
 
-    // Store tokens
     api.setTokens(response.data.accessToken, response.data.refreshToken);
-
-    // Initialize vault
     await this.initialize(masterPassword, saltBase64);
 
-    // Store user email
     if (typeof window !== 'undefined') {
       localStorage.setItem('userEmail', email);
     }
@@ -83,20 +103,33 @@ class VaultManager {
     // Generate auth hash
     const authHash = await hash(masterPassword + email);
 
-    // Login with API
+    if (DEMO_MODE) {
+      // Demo mode - check local storage
+      const user = demoStorage.findUserByEmail(email);
+      if (!user || user.passwordHash !== authHash) {
+        throw new Error('Invalid email or password');
+      }
+      
+      demoStorage.setSession(user.id, email);
+      await this.initialize(masterPassword, user.salt);
+      
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('userEmail', email);
+      }
+      
+      return { user: { id: user.id, email } };
+    }
+
+    // Production mode - use API
     const response = await api.login(email, authHash);
 
     if (response.error) {
       throw new Error(response.error);
     }
 
-    // Store tokens
     api.setTokens(response.data.accessToken, response.data.refreshToken);
-
-    // Initialize vault with returned salt
     await this.initialize(masterPassword, response.data.salt);
 
-    // Store user email
     if (typeof window !== 'undefined') {
       localStorage.setItem('userEmail', email);
     }
@@ -105,7 +138,11 @@ class VaultManager {
   }
 
   async logout() {
-    await api.logout();
+    if (DEMO_MODE) {
+      demoStorage.clearSession();
+    } else {
+      await api.logout();
+    }
     this.encryptionKey = null;
     this.masterPassword = null;
     this.salt = null;
@@ -116,6 +153,41 @@ class VaultManager {
       throw new Error('Vault not initialized');
     }
 
+    if (DEMO_MODE) {
+      // Demo mode - get from local storage
+      const session = demoStorage.getSession();
+      if (!session) {
+        throw new Error('Not logged in');
+      }
+      
+      const items = demoStorage.getItems(session.userId);
+      
+      // Decrypt all items
+      const decryptedItems = await Promise.all(
+        items.map(async (item) => {
+          const decryptedData = await decrypt(
+            item.encryptedData,
+            item.iv,
+            this.encryptionKey!
+          );
+          const data = JSON.parse(decryptedData);
+
+          return {
+            id: item.id,
+            type: item.type,
+            name: item.name,
+            ...data,
+            favorite: item.favorite,
+            createdAt: item.createdAt,
+            updatedAt: item.updatedAt,
+          };
+        })
+      );
+      
+      return decryptedItems;
+    }
+
+    // Production mode - use API
     const response = await api.getItems();
 
     if (response.error) {
@@ -161,14 +233,45 @@ class VaultManager {
       this.encryptionKey
     );
 
-    // Create item via API
+    if (DEMO_MODE) {
+      // Demo mode - save to local storage
+      const session = demoStorage.getSession();
+      if (!session) {
+        throw new Error('Not logged in');
+      }
+      
+      const newItem = {
+        id: Date.now().toString(),
+        userId: session.userId,
+        type,
+        name,
+        encryptedData: ciphertext,
+        iv,
+        favorite,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      
+      demoStorage.saveItem(newItem);
+      
+      return {
+        id: newItem.id,
+        type,
+        name,
+        ...sensitiveData,
+        favorite,
+        createdAt: newItem.createdAt,
+        updatedAt: newItem.updatedAt,
+      };
+    }
+
+    // Production mode - use API
     const response = await api.createItem(type, name, ciphertext, iv, favorite);
 
     if (response.error) {
       throw new Error(response.error);
     }
 
-    // Return decrypted item
     return {
       id: response.data.id,
       type: response.data.type,
@@ -194,14 +297,34 @@ class VaultManager {
       this.encryptionKey
     );
 
-    // Update item via API
+    if (DEMO_MODE) {
+      // Demo mode - update in local storage
+      demoStorage.updateItem(id, {
+        type,
+        name,
+        encryptedData: ciphertext,
+        iv,
+        favorite,
+      });
+      
+      return {
+        id,
+        type,
+        name,
+        ...sensitiveData,
+        favorite,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Production mode - use API
     const response = await api.updateItem(id, type, name, ciphertext, iv, favorite);
 
     if (response.error) {
       throw new Error(response.error);
     }
 
-    // Return decrypted item
     return {
       id: response.data.id,
       type: response.data.type,
@@ -214,6 +337,13 @@ class VaultManager {
   }
 
   async deleteItem(id: string): Promise<void> {
+    if (DEMO_MODE) {
+      // Demo mode - delete from local storage
+      demoStorage.deleteItem(id);
+      return;
+    }
+
+    // Production mode - use API
     const response = await api.deleteItem(id);
 
     if (response.error) {

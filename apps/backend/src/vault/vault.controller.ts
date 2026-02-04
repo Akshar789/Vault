@@ -20,24 +20,24 @@ export class VaultController {
   constructor(private readonly vaultService: VaultService) {}
 
   @Get('items')
-  async getItems(@Request() req) {
+  async getItems(@Request() req: any) {
     return this.vaultService.getItems(req.user.userId);
   }
 
   @Get('items/:id')
-  async getItem(@Request() req, @Param('id') id: string) {
+  async getItem(@Request() req: any, @Param('id') id: string) {
     return this.vaultService.getItem(req.user.userId, id);
   }
 
   @Post('items')
   @HttpCode(HttpStatus.CREATED)
-  async createItem(@Request() req, @Body() createItemDto: any) {
+  async createItem(@Request() req: any, @Body() createItemDto: any) {
     return this.vaultService.createItem(req.user.userId, createItemDto);
   }
 
   @Put('items/:id')
   async updateItem(
-    @Request() req,
+    @Request() req: any,
     @Param('id') id: string,
     @Body() updateItemDto: any,
   ) {
@@ -46,7 +46,7 @@ export class VaultController {
 
   @Delete('items/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteItem(@Request() req, @Param('id') id: string) {
+  async deleteItem(@Request() req: any, @Param('id') id: string) {
     return this.vaultService.deleteItem(req.user.userId, id);
   }
 }

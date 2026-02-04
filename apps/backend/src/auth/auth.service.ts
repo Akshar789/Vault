@@ -114,7 +114,7 @@ export class AuthService {
     const newRefreshToken = await this.generateRefreshToken(user.id);
 
     // Delete old refresh token
-    await this.redisService.del(`refresh:${refreshToken}`);
+    await this.redisService.delete(`refresh:${refreshToken}`);
 
     return {
       accessToken,
@@ -126,7 +126,7 @@ export class AuthService {
     const { refreshToken } = logoutDto;
 
     // Delete refresh token from Redis
-    await this.redisService.del(`refresh:${refreshToken}`);
+    await this.redisService.delete(`refresh:${refreshToken}`);
 
     return { message: 'Logged out successfully' };
   }
