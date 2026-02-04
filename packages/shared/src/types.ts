@@ -460,6 +460,64 @@ export interface UpdateVaultItemRequest {
 }
 
 // =============================================================================
+// SECURE SHARING
+// =============================================================================
+
+export enum SharePermission {
+  VIEW = 'view',
+  EDIT = 'edit',
+}
+
+/**
+ * Shared vault item
+ * 
+ * SECURITY: Item encrypted separately for each recipient
+ * - Owner decrypts item with their key
+ * - Owner re-encrypts with recipient's public key
+ * - Recipient decrypts with their private key
+ * - Server cannot decrypt
+ */
+export interface SharedVaultItem {
+  id: string;
+  itemId: string;
+  ownerId: string;
+  ownerEmail: string;
+  recipientId: string;
+  recipientEmail: string;
+  permission: SharePermission;
+  
+  // Item data encrypted with recipient's public key
+  encryptedData: EncryptedBlob;
+  
+  // Metadata
+  itemType: VaultItemType;
+  itemName: string; // Not encrypted for display
+  
+  sharedAt: Date;
+  expiresAt: Date | null;
+  revokedAt: Date | null;
+}
+
+/**
+ * Share item request
+ */
+export interface ShareItemRequest {
+  itemId: string;
+  recipientEmail: string;
+  permission: SharePermission;
+  encryptedData: EncryptedBlob; // Item encrypted with recipient's public key
+  expiresAt?: Date;
+}
+
+/**
+ * Update share request
+ */
+export interface UpdateShareRequest {
+  permission: SharePermission;
+  expiresAt?: Date | null;
+}
+
+// =============================================================================
 // AUDIT LOGS
 // =============================================================================
 

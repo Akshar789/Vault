@@ -20,6 +20,17 @@ export interface VaultItem {
   favorite: boolean;
   createdAt: string;
   updatedAt: string;
+  isShared?: boolean;
+  sharedBy?: string;
+  permission?: 'view' | 'edit';
+}
+
+export interface ShareInfo {
+  id: string;
+  recipientEmail: string;
+  permission: 'view' | 'edit';
+  sharedAt: string;
+  expiresAt: string | null;
 }
 
 class VaultManager {
@@ -160,6 +171,7 @@ class VaultManager {
         throw new Error('Not logged in');
       }
       
+      // Get own items
       const items = demoStorage.getItems(session.userId);
       
       // Decrypt all items
@@ -184,7 +196,33 @@ class VaultManager {
         })
       );
       
-      return decryptedItems;
+      // Get shared items
+      const sharedItems = demoStorage.getSharedWithMe(session.userId);
+      const decryptedSharedItems = await Promise.all(
+        sharedItems.map(async (share) => {
+          const decryptedData = await decrypt(
+            share.encryptedData,
+            share.iv,
+            this.encryptionKey!
+          );
+          const data = JSON.parse(decryptedData);
+
+          return {
+            id: share.itemId,
+            type: share.itemType,
+            name: share.itemName,
+            ...data,
+            favorite: false,
+            createdAt: share.sharedAt,
+            updatedAt: share.sharedAt,
+            isShared: true,
+            sharedBy: share.ownerEmail,
+            permission: share.permission,
+          };
+        })
+      );
+      
+      return [...decryptedItems, ...decryptedSharedItems];
     }
 
     // Production mode - use API
@@ -353,6 +391,103 @@ class VaultManager {
 
   isInitialized(): boolean {
     return this.encryptionKey !== null;
+  }
+
+  // Sharing methods
+  async shareItem(itemId: string, recipientEmail: string, permission: 'view' | 'edit' = 'view'): Promise<void> {
+    if (!this.encryptionKey) {
+      throw new Error('Vault not initialized');
+    }
+
+    if (DEMO_MODE) {
+      const session = demoStorage.getSession();
+      if (!session) {
+        throw new Error('Not logged in');
+      }
+
+      // Check if recipient exists
+      const recipient = demoStorage.findUserByEmail(recipientEmail);
+      if (!recipient) {
+        throw new Error('Recipient not found. They need to create an account first.');
+      }
+
+      // Get the item
+      const item = demoStorage.getItemById(itemId);
+      if (!item) {
+        throw new Error('Item not found');
+      }
+
+      if (item.userId !== session.userId) {
+        throw new Error('You can only share your own items');
+      }
+
+      // Check if already shared with this user
+      const existingShares = demoStorage.getSharesForItem(itemId);
+      const alreadyShared = existingShares.find(s => s.recipientEmail === recipientEmail && !s.revokedAt);
+      if (alreadyShared) {
+        throw new Error('Item already shared with this user');
+      }
+
+      // Create share
+      const share = {
+        id: Date.now().toString(),
+        itemId: item.id,
+        ownerId: session.userId,
+        ownerEmail: session.email,
+        recipientId: recipient.id,
+        recipientEmail: recipient.email,
+        permission,
+        itemType: item.type,
+        itemName: item.name,
+        encryptedData: item.encryptedData,
+        iv: item.iv,
+        sharedAt: new Date().toISOString(),
+        expiresAt: null,
+        revokedAt: null,
+      };
+
+      demoStorage.shareItem(share);
+      return;
+    }
+
+    // Production mode - use API
+    throw new Error('Sharing not implemented in production mode yet');
+  }
+
+  async getSharesForItem(itemId: string): Promise<ShareInfo[]> {
+    if (DEMO_MODE) {
+      const shares = demoStorage.getSharesForItem(itemId);
+      return shares.map(share => ({
+        id: share.id,
+        recipientEmail: share.recipientEmail,
+        permission: share.permission,
+        sharedAt: share.sharedAt,
+        expiresAt: share.expiresAt,
+      }));
+    }
+
+    // Production mode - use API
+    throw new Error('Sharing not implemented in production mode yet');
+  }
+
+  async revokeShare(shareId: string): Promise<void> {
+    if (DEMO_MODE) {
+      demoStorage.revokeShare(shareId);
+      return;
+    }
+
+    // Production mode - use API
+    throw new Error('Sharing not implemented in production mode yet');
+  }
+
+  async updateSharePermission(shareId: string, permission: 'view' | 'edit'): Promise<void> {
+    if (DEMO_MODE) {
+      demoStorage.updateShare(shareId, { permission });
+      return;
+    }
+
+    // Production mode - use API
+    throw new Error('Sharing not implemented in production mode yet');
   }
 
   private bufferToBase64(buffer: ArrayBuffer): string {
