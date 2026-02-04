@@ -1,0 +1,39 @@
+{
+  "name": "zero-knowledge-vault",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "npm run dev --workspace=@vault/backend",
+    "dev:frontend": "npm run dev --workspace=@vault/frontend",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "test:backend": "npm run test --workspace=@vault/backend",
+    "test:frontend": "npm run test --workspace=@vault/frontend",
+    "test:security": "npm run test:security --workspace=@vault/backend",
+    "migrate": "npm run migrate --workspace=@vault/backend",
+    "lint": "npm run lint --workspaces",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "deploy:backend": "cd apps/backend && fly deploy",
+    "deploy:frontend": "cd apps/frontend && vercel deploy --prod"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "concurrently": "^8.2.2",
+    "prettier": "^3.1.1",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "ioredis": "^5.9.2",
+    "pg": "^8.18.0"
+  }
+}

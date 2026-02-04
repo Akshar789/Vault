@@ -1,0 +1,53 @@
+app = "vault-backend"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  NODE_ENV = "production"
+  
+  # Argon2 parameters (tunable)
+  ARGON2_MEMORY = "65536"
+  ARGON2_TIME = "3"
+  ARGON2_PARALLELISM = "4"
+  
+  # Rate limiting
+  RATE_LIMIT_MAX = "100"
+  RATE_LIMIT_WINDOW_MS = "900000"
+  LOGIN_RATE_LIMIT_MAX = "5"
+  
+  # Security
+  MAX_FAILED_LOGIN_ATTEMPTS = "5"
+  ACCOUNT_LOCKOUT_DURATION_MS = "900000"
+  MAX_DEVICES_PER_USER = "10"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 1000
+    soft_limit = 800
+
+[[http_service.checks]]
+  grace_period = "10s"
+  interval = "30s"
+  method = "GET"
+  timeout = "5s"
+  path = "/health"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512
+
+[metrics]
+  port = 9091
+  path = "/metrics"

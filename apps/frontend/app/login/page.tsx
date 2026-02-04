@@ -17,18 +17,13 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      // TODO: Implement login logic
-      // 1. Derive key from master password
-      // 2. Call API to authenticate
-      // 3. Store session token
-      // 4. Redirect to vault
+      const { vaultManager } = await import('@/lib/vault-manager')
       
-      console.log('Login:', { email, masterPassword: '***' })
+      // Login user with backend
+      await vaultManager.login(email, masterPassword)
       
-      // Placeholder
-      setTimeout(() => {
-        router.push('/vault')
-      }, 1000)
+      // Redirect to vault
+      router.push('/vault')
     } catch (err: any) {
       setError(err.message || 'Login failed')
     } finally {

@@ -29,20 +29,13 @@ export default function RegisterPage() {
     setLoading(true)
 
     try {
-      // TODO: Implement registration logic
-      // 1. Derive key from master password
-      // 2. Generate RSA key pair
-      // 3. Encrypt private key with derived key
-      // 4. Send to API: email, public key, encrypted private key
-      // 5. Store session token
-      // 6. Redirect to vault
+      const { vaultManager } = await import('@/lib/vault-manager')
       
-      console.log('Register:', { email, masterPassword: '***' })
+      // Register user with backend
+      await vaultManager.register(email, masterPassword)
       
-      // Placeholder
-      setTimeout(() => {
-        router.push('/vault')
-      }, 1000)
+      // Redirect to vault
+      router.push('/vault')
     } catch (err: any) {
       setError(err.message || 'Registration failed')
     } finally {
