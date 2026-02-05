@@ -7,7 +7,7 @@ import { deriveKey, encrypt, decrypt, generateSalt, hash } from './crypto';
 import { demoStorage } from './demo-storage';
 
 // Demo mode flag
-const DEMO_MODE = true; // Set to false when backend is ready
+const DEMO_MODE = false; // Backend is ready - connected to Supabase!
 
 export interface VaultItem {
   id: string;

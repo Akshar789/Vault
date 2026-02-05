@@ -1,4 +1,4 @@
-app = "vault-backend"
+app = "vault-backend-akshar"
 primary_region = "iad"
 
 [build]
