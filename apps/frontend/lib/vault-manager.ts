@@ -100,14 +100,15 @@ class VaultManager {
       throw new Error(response.error);
     }
 
-    api.setTokens(response.data.accessToken, response.data.refreshToken);
+    const data = response.data as any;
+    api.setTokens(data.accessToken, data.refreshToken);
     await this.initialize(masterPassword, saltBase64);
 
     if (typeof window !== 'undefined') {
       localStorage.setItem('userEmail', email);
     }
 
-    return response.data;
+    return data;
   }
 
   async login(email: string, masterPassword: string) {
@@ -138,14 +139,15 @@ class VaultManager {
       throw new Error(response.error);
     }
 
-    api.setTokens(response.data.accessToken, response.data.refreshToken);
-    await this.initialize(masterPassword, response.data.salt);
+    const data = response.data as any;
+    api.setTokens(data.accessToken, data.refreshToken);
+    await this.initialize(masterPassword, data.salt);
 
     if (typeof window !== 'undefined') {
       localStorage.setItem('userEmail', email);
     }
 
-    return response.data;
+    return data;
   }
 
   async logout() {
@@ -232,21 +234,22 @@ class VaultManager {
       throw new Error(response.error);
     }
 
+    const data = response.data as any;
     // Decrypt all items
     const items = await Promise.all(
-      response.data.map(async (item: any) => {
+      data.map(async (item: any) => {
         const decryptedData = await decrypt(
           item.encrypted_data,
           item.iv,
           this.encryptionKey!
         );
-        const data = JSON.parse(decryptedData);
+        const itemData = JSON.parse(decryptedData);
 
         return {
           id: item.id,
           type: item.type,
           name: item.name,
-          ...data,
+          ...itemData,
           favorite: item.favorite,
           createdAt: item.created_at,
           updatedAt: item.updated_at,
@@ -310,14 +313,15 @@ class VaultManager {
       throw new Error(response.error);
     }
 
+    const data = response.data as any;
     return {
-      id: response.data.id,
-      type: response.data.type,
-      name: response.data.name,
+      id: data.id,
+      type: data.type,
+      name: data.name,
       ...sensitiveData,
-      favorite: response.data.favorite,
-      createdAt: response.data.created_at,
-      updatedAt: response.data.updated_at,
+      favorite: data.favorite,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
     };
   }
 
@@ -363,14 +367,15 @@ class VaultManager {
       throw new Error(response.error);
     }
 
+    const data = response.data as any;
     return {
-      id: response.data.id,
-      type: response.data.type,
-      name: response.data.name,
+      id: data.id,
+      type: data.type,
+      name: data.name,
       ...sensitiveData,
-      favorite: response.data.favorite,
-      createdAt: response.data.created_at,
-      updatedAt: response.data.updated_at,
+      favorite: data.favorite,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
     };
   }
 
@@ -490,8 +495,8 @@ class VaultManager {
     throw new Error('Sharing not implemented in production mode yet');
   }
 
-  private bufferToBase64(buffer: ArrayBuffer): string {
-    const bytes = new Uint8Array(buffer);
+  private bufferToBase64(buffer: ArrayBuffer | Uint8Array): string {
+    const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
     let binary = '';
     for (let i = 0; i < bytes.byteLength; i++) {
       binary += String.fromCharCode(bytes[i]);
