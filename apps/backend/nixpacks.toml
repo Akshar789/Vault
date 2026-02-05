@@ -1,0 +1,18 @@
+[phases.setup]
+nixPkgs = ["nodejs-18_x"]
+
+[phases.install]
+cmds = [
+  "cd ../..",
+  "npm ci",
+  "npm run build --workspace=packages/shared"
+]
+
+[phases.build]
+cmds = [
+  "cd apps/backend",
+  "npm run build"
+]
+
+[start]
+cmd = "cd apps/backend && node dist/main.js"
