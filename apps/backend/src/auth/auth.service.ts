@@ -16,42 +16,46 @@ export class AuthService {
   async register(registerDto: any) {
     const { email, authHash, encryptedPrivateKey, publicKey, salt } = registerDto;
 
-    // Hash the auth hash (double hashing for security)
-    const hashedAuthHash = await bcrypt.hash(authHash, 12);
+    try {
+      // Hash the auth hash (double hashing for security)
+      const hashedAuthHash = await bcrypt.hash(authHash, 12);
 
-    // Create user
-    const userId = uuidv4();
-    const query = `
-      INSERT INTO users (id, email, auth_hash, encrypted_private_key, public_key, salt)
-      VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING id, email, created_at
-    `;
+      // Create user
+      const userId = uuidv4();
+      const query = `
+        INSERT INTO users (id, email, auth_hash, encrypted_private_key, public_key, salt)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id, email, created_at
+      `;
 
-    const result = await this.databaseService.query(query, [
-      userId,
-      email,
-      hashedAuthHash,
-      encryptedPrivateKey,
-      publicKey,
-      salt,
-    ]);
+      const result = await this.databaseService.query(query, [
+        userId,
+        email,
+        hashedAuthHash,
+        encryptedPrivateKey || '',
+        publicKey || '',
+        salt,
+      ]);
 
-    const user = result.rows[0];
+      const user = result.rows[0];
 
-    // Generate tokens
-    const accessToken = this.generateAccessToken(user.id, user.email);
-    const refreshToken = await this.generateRefreshToken(user.id);
+      // Generate tokens
+      const accessToken = this.generateAccessToken(user.id, user.email);
+      const refreshToken = await this.generateRefreshToken(user.id);
 
-    return {
-      user: {
-        id: user.id,
-        email: user.email,
-      },
-      accessToken,
-      refreshToken,
-      encryptedPrivateKey,
-      publicKey,
-    };
+      return {
+        user: {
+          id: user.id,
+          email: user.email,
+        },
+        accessToken,
+        refreshToken,
+        salt,
+      };
+    } catch (error) {
+      console.error('Registration error:', error);
+      throw error;
+    }
   }
 
   async login(loginDto: any) {
@@ -142,12 +146,17 @@ export class AuthService {
   private async generateRefreshToken(userId: string): Promise<string> {
     const refreshToken = uuidv4();
 
-    // Store in Redis with 7 day expiry
-    await this.redisService.set(
-      `refresh:${refreshToken}`,
-      userId,
-      7 * 24 * 60 * 60,
-    );
+    try {
+      // Store in Redis with 7 day expiry
+      await this.redisService.set(
+        `refresh:${refreshToken}`,
+        userId,
+        7 * 24 * 60 * 60,
+      );
+    } catch (error) {
+      console.error('Redis error (non-fatal):', error.message);
+      // Continue even if Redis fails - refresh tokens just won't persist
+    }
 
     return refreshToken;
   }
