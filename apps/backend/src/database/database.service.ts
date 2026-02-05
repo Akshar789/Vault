@@ -22,12 +22,11 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       connectionString: process.env.DATABASE_URL,
       ssl: process.env.NODE_ENV === 'production' 
         ? { rejectUnauthorized: true }
-        : false, // Disable SSL in development to avoid certificate issues
+        : false,
       max: parseInt(process.env.DB_POOL_MAX || '10'),
       min: parseInt(process.env.DB_POOL_MIN || '2'),
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
-      // Statement timeout to prevent long-running queries
       statement_timeout: 30000,
     });
 

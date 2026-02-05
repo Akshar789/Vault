@@ -4,7 +4,7 @@ import { PassportModule } from '@nestjs/passport';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
-import { DatabaseService } from '../database/database.service';
+import { SupabaseClientService } from '../database/supabase-client.service';
 import { RedisService } from '../redis/redis.service';
 
 @Module({
@@ -18,7 +18,7 @@ import { RedisService } from '../redis/redis.service';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, DatabaseService, RedisService],
+  providers: [AuthService, JwtStrategy, SupabaseClientService, RedisService],
   exports: [AuthService, JwtStrategy, PassportModule],
 })
 export class AuthModule {}

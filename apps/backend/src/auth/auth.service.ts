@@ -2,14 +2,14 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
-import { DatabaseService } from '../database/database.service';
+import { SupabaseClientService } from '../database/supabase-client.service';
 import { RedisService } from '../redis/redis.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly jwtService: JwtService,
-    private readonly databaseService: DatabaseService,
+    private readonly supabaseClient: SupabaseClientService,
     private readonly redisService: RedisService,
   ) {}
 
@@ -20,24 +20,16 @@ export class AuthService {
       // Hash the auth hash (double hashing for security)
       const hashedAuthHash = await bcrypt.hash(authHash, 12);
 
-      // Create user
+      // Create user using Supabase REST API
       const userId = uuidv4();
-      const query = `
-        INSERT INTO users (id, email, auth_hash, encrypted_private_key, public_key, salt)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING id, email, created_at
-      `;
-
-      const result = await this.databaseService.query(query, [
-        userId,
+      const user = await this.supabaseClient.insert('users', {
+        id: userId,
         email,
-        hashedAuthHash,
-        encryptedPrivateKey || '',
-        publicKey || '',
+        auth_hash: hashedAuthHash,
+        encrypted_private_key: encryptedPrivateKey || '',
+        public_key: publicKey || '',
         salt,
-      ]);
-
-      const user = result.rows[0];
+      });
 
       // Generate tokens
       const accessToken = this.generateAccessToken(user.id, user.email);
@@ -61,15 +53,17 @@ export class AuthService {
   async login(loginDto: any) {
     const { email, authHash } = loginDto;
 
-    // Find user
-    const query = 'SELECT * FROM users WHERE email = $1';
-    const result = await this.databaseService.query(query, [email]);
+    // Find user using Supabase REST API
+    const users = await this.supabaseClient.select('users', {
+      eq: { email },
+      limit: 1,
+    });
 
-    if (result.rows.length === 0) {
+    if (!users || users.length === 0) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const user = result.rows[0];
+    const user = users[0];
 
     // Verify auth hash
     const isValid = await bcrypt.compare(authHash, user.auth_hash);
@@ -103,15 +97,18 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    // Get user
-    const query = 'SELECT id, email FROM users WHERE id = $1';
-    const result = await this.databaseService.query(query, [userId]);
+    // Get user using Supabase REST API
+    const users = await this.supabaseClient.select('users', {
+      select: 'id,email',
+      eq: { id: userId },
+      limit: 1,
+    });
 
-    if (result.rows.length === 0) {
+    if (!users || users.length === 0) {
       throw new UnauthorizedException('User not found');
     }
 
-    const user = result.rows[0];
+    const user = users[0];
 
     // Generate new tokens
     const accessToken = this.generateAccessToken(user.id, user.email);
